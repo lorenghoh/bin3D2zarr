@@ -2,47 +2,55 @@
 Run this script in the main folder
 Now supports multiple processes
 """
-import sys
-import json
+import os
+import shutil
+
 import subprocess as sp
 
 import xarray as xr
-import zarr as zr
 
 from pathlib import Path
 
 from lib.config import read_config
 from lib.handler import update_dict, find_exclusion_list
 
-config = read_config()
-bin3D2nc = f"{config['root']}/{config['bin3D2nc']}"
+CONFIG = read_config()
+BIN3D2NC = Path(f"{CONFIG['root']}/{CONFIG['bin3D2nc']}")
+TMPDIR = Path(os.environ["TMPDIR"])
 
 
-def bin3D_to_nc(key, target=0, flag=1, print_stdout=False):
+def bin3D_to_nc(key, target=4, flag=1, print_stdout=False):
+    # Ensure target files are in $TMPDIR
+    bin3D2nc = TMPDIR / BIN3D2NC.name
+    tmp_key = TMPDIR / Path(key).name
+    shutil.copy(BIN3D2NC, bin3D2nc)
+    shutil.copy(key, tmp_key)
+
     try:
-        result = sp.run([bin3D2nc, key], check=True, capture_output=True,)
+        result = sp.run([bin3D2nc, tmp_key], check=True, capture_output=True,)
     except sp.CalledProcessError as e:
         print(f"Error translating {key}\n", e.output)
 
         # Open and mark file incomplete
         update_dict(key, target=target, flag=flag)
         raise
-    finally:
-        if print_stdout:
-            print(sys.stdout.buffer.write(result.stdout))
+
+    bin3D2nc.unlink()
+
+    if print_stdout:
+        print(result.stdout)
 
     # When all operations are complete
     update_dict(key, flag=2)
 
 
 def nc_to_zarr(key):
-    file_name = Path(key).with_suffix(".nc")
+    tmp_key = TMPDIR / Path(key).with_suffix(".nc").name
+    exc_list = find_exclusion_list(tmp_key.name)
 
-    exc_list = find_exclusion_list(file_name.name)
-
-    with xr.open_dataset(file_name) as ds:
+    with xr.open_dataset(tmp_key) as ds_nc:
         try:
-            ds = ds.squeeze("time").drop(exc_list)
+            ds_nc = ds_nc.squeeze("time").drop(exc_list)
         except Exception:
             raise ValueError
 
@@ -52,36 +60,55 @@ def nc_to_zarr(key):
             # comp = {'compressor': zr.Blosc(cname='zstd')}
             # encoding = {var: comp for var in variables}
 
-            zarr_name = file_name.with_suffix(".zarr")
-            ds.to_zarr(f"{zarr_name}")
-        except ValueError:
-            print(file_name.name)
-            print("! Duplicate found. Check leftover zarr folder. \n")
+            # Use $TMPDIR for Zarr output
+            zr_path = tmp_key.with_suffix(".zarr")
+            ds_nc.to_zarr(f"{zr_path}", mode="w")
 
-    # Mark nc -> zarr conversion complete
-    update_dict(key, flag=3)
+            # Mark Zarr conversion complete
+            update_dict(key, flag=3)
+
+            # Validate Zarr output against netCDF
+            validate_zarr(key)
+        except ValueError:
+            print(Path(key.name))
+            print("! Duplicate found. Check leftover zarr folder. \n")
 
 
 def validate_zarr(key):
-    nc_path = Path(key).with_suffix(".nc")
-    zr_path = Path(key).with_suffix(".zarr")
+    nc_path = TMPDIR / Path(key).with_suffix(".nc").name
+    zr_path = TMPDIR / Path(key).with_suffix(".zarr").name
 
     exc_list = find_exclusion_list(nc_path.name)
 
-    nc_file = nc_path.as_posix()
-    zr_file = zr_path.as_posix()
-    with xr.open_dataset(nc_file) as d_nc, xr.open_zarr(zr_file) as d_za:
+    # Since I do not care for Windows
+    nc_str = nc_path.as_posix()
+    zr_str = zr_path.as_posix()
+    with xr.open_dataset(nc_str) as d_nc, xr.open_zarr(zr_str) as d_za:
         try:
             d_nc = d_nc.squeeze("time").drop(exc_list)
 
-            if d_nc.equals(d_za):
-                Path(key).with_suffix(".bin3D").unlink()
-                Path(key).with_suffix(".nc").unlink()
-            else:
+            flag = d_nc.equals(d_za)
+
+            if flag is False:
                 raise ValueError
-        except Exception:
-            raise Exception
+        except ValueError:
+            print("Translated Zarr dataset does not match .nc file")
+            raise
+
+    # Move Zarr output
+    # Odd error with shutil.move that throws an error with Path
+    # But this will be fixed in Python 3.9 (i.e. update later)
+    zr_output = Path(key).with_suffix(".zarr")
+
+    if zr_output.exists():
+        shutil.rmtree(zr_output)
+    shutil.move(zr_str, zr_output.as_posix())
+
+    # Unlink leftover files
+    Path(key).with_suffix(".bin3D").unlink()
+
+    for item in TMPDIR.glob('*'):
+        item.unlink()
 
     # Mark Zarr validation complete
     update_dict(key, flag=4)
-

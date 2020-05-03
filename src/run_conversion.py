@@ -12,7 +12,6 @@ def convert():
         raise Exception
 
     bin3d.nc_to_zarr(key)
-    bin3d.validate_zarr(key)
 
 
 if __name__ == "__main__":
