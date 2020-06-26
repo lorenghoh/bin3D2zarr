@@ -104,6 +104,8 @@ def validate_zarr(key):
         shutil.rmtree(zr_output)
     shutil.move(zr_str, zr_output.as_posix())
 
+    return  # temp breakpoint
+
     # Unlink leftover files
     Path(key).with_suffix(".bin3D").unlink()
 

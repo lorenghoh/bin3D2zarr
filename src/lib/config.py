@@ -1,20 +1,27 @@
-import os, json, pathlib
+import json
+
+from pathlib import Path
+
+# Resolve file path for project working directory
+pwd = Path(__file__).absolute().parents[2]
+print(pwd)
 
 
 def write_template():
-    with open("config.json", "w") as f:
+    with open(f"{pwd}/config.json", "w") as config_file:
         config = {
+            "pwd": pwd.as_posix(),
             "root": "",
             "casename": "",
-            "src": "OUT_3D",
+            "output": "",
             "bin3D2nc": "UTIL/bin3D2nc",
         }
-        json.dump(config, f, indent=0)
+        json.dump(config, config_file, indent=0)
 
 
 def read_config():
     try:
-        with open("config.json", "r") as f:
+        with open(f"{pwd}/config.json", "r") as f:
             config = json.load(f)
     except FileNotFoundError:
         write_template()
@@ -25,7 +32,7 @@ def read_config():
 
 
 if __name__ == "__main__":
-    read_config()
+    config = read_config()
 
     # Confirm config output
-    print(read_config())
+    print(config)
