@@ -20,6 +20,20 @@ BIN3D2NC = Path(f"{CONFIG['root']}/{CONFIG['bin3D2nc']}")
 TMPDIR = Path(os.environ["TMPDIR"])
 
 
+def xopen(target):
+    """
+    Helper function for xarray.open_dataset()
+    """
+    if target.suffix == ".nc":
+        ds = xr.open_dataset(target)
+    elif target.suffix == ".zip":
+        ds = xr.open_zarr(zr.ZipStore(target))
+    else:
+        raise TypeError("Dataset type not recognized")
+
+    return ds
+
+
 def bin3D_to_nc(key, target=4, flag=1, print_stdout=False):
     # Ensure target files are in $TMPDIR
     bin3D2nc = TMPDIR / BIN3D2NC.name
@@ -49,7 +63,7 @@ def nc_to_zarr(key):
     tmp_key = TMPDIR / Path(key).with_suffix(".nc").name
     exc_list = find_exclusion_list(tmp_key.name)
 
-    with xr.open_dataset(tmp_key) as ds_nc:
+    with xopen(tmp_key) as ds_nc:
         try:
             ds_nc = ds_nc.squeeze("time").drop(exc_list)
         except Exception:
@@ -85,7 +99,7 @@ def validate_zarr(key):
     # Since I do not care for Windows
     nc_str = nc_path.as_posix()
     zr_str = zr_path.as_posix()
-    with xr.open_dataset(nc_str) as d_nc, xr.open_zarr(zr.ZipStore(zr_str)) as d_za:
+    with xopen(nc_str) as d_nc, xopen(zr.ZipStore(zr_str)) as d_za:
         try:
             d_nc = d_nc.squeeze("time").drop(exc_list)
 
