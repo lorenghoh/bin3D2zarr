@@ -8,6 +8,7 @@ import shutil
 import subprocess as sp
 
 import xarray as xr
+import zarr as zr
 
 from pathlib import Path
 
@@ -61,8 +62,9 @@ def nc_to_zarr(key):
             # encoding = {var: comp for var in variables}
 
             # Use $TMPDIR for Zarr output
-            zr_path = tmp_key.with_suffix(".zarr")
-            ds_nc.to_zarr(f"{zr_path}", mode="w")
+            zr_path = tmp_key.with_suffix(".zarr.zip")
+            with zr.ZipStore(f"{zr_path}") as store:
+                ds_nc.to_zarr(store, mode="w")
 
             # Mark Zarr conversion complete
             update_dict(key, flag=3)
@@ -76,14 +78,14 @@ def nc_to_zarr(key):
 
 def validate_zarr(key):
     nc_path = TMPDIR / Path(key).with_suffix(".nc").name
-    zr_path = TMPDIR / Path(key).with_suffix(".zarr").name
+    zr_path = TMPDIR / Path(key).with_suffix(".zarr.zip").name
 
     exc_list = find_exclusion_list(nc_path.name)
 
     # Since I do not care for Windows
     nc_str = nc_path.as_posix()
     zr_str = zr_path.as_posix()
-    with xr.open_dataset(nc_str) as d_nc, xr.open_zarr(zr_str) as d_za:
+    with xr.open_dataset(nc_str) as d_nc, xr.open_zarr(zr.ZipStore(zr_str)) as d_za:
         try:
             d_nc = d_nc.squeeze("time").drop(exc_list)
 
@@ -98,18 +100,16 @@ def validate_zarr(key):
     # Move Zarr output
     # Odd error with shutil.move that throws an error with Path
     # But this will be fixed in Python 3.9 (i.e. update later)
-    zr_output = Path(key).with_suffix(".zarr")
+    zr_output = Path(key).with_suffix(".zarr.zip")
 
     if zr_output.exists():
         shutil.rmtree(zr_output)
     shutil.move(zr_str, zr_output.as_posix())
 
-    return  # temp breakpoint
-
     # Unlink leftover files
     Path(key).with_suffix(".bin3D").unlink()
 
-    for item in TMPDIR.glob('*'):
+    for item in TMPDIR.glob("*"):
         item.unlink()
 
     # Mark Zarr validation complete
