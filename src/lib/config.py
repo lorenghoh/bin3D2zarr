@@ -4,7 +4,6 @@ from pathlib import Path
 
 # Resolve file path for project working directory
 pwd = Path(__file__).absolute().parents[2]
-print(pwd)
 
 
 def write_template():
@@ -29,6 +28,10 @@ def read_config():
         print("Config template generated. Complete config.json \n")
         raise
     return config
+
+
+def show_config():
+    pass
 
 
 if __name__ == "__main__":

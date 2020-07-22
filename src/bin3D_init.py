@@ -18,6 +18,9 @@ def main():
     for item in file_list:
         file_dict[item] = 0
 
+    for item in file_list[:12]:
+        print(item)
+
     with open(f"{pwd}/bin3D_list.json", "w") as jf:
         jf.write(json.dumps(file_dict, indent=4))
 
