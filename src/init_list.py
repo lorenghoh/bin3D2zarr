@@ -10,10 +10,10 @@ pwd = config["pwd"]
 
 
 def main():
-    output_dir = config["output"]
-    fdir = f"{output_dir}"
+    bin3D_dir = f"{config['src']}"
+    print(bin3D_dir)
 
-    file_list = sorted(glob.glob(f"{fdir}/{config['casename']}_*.bin3D"))
+    file_list = sorted(glob.glob(f"{bin3D_dir}/{config['casename']}_*.bin3D"))
     file_dict = dd(int)
     for item in file_list:
         file_dict[item] = 0
