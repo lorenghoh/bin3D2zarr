@@ -4,6 +4,7 @@ Now supports multiple processes
 """
 import os
 import shutil
+import bsddb3
 
 import subprocess as sp
 
@@ -26,8 +27,8 @@ def xopen(target):
     """
     if target.suffix == ".nc":
         ds = xr.open_dataset(target)
-    elif target.suffix == ".zip":
-        ds = xr.open_zarr(zr.ZipStore(target))
+    elif target.suffix == ".db":
+        ds = xr.open_zarr(zr.DBMStore(target, open=bsddb3.btopen))
     else:
         raise TypeError("Dataset type not recognized")
 
@@ -76,8 +77,8 @@ def nc_to_zarr(key):
             # encoding = {var: comp for var in variables}
 
             # Use $TMPDIR for Zarr output
-            zr_path = tmp_key.with_suffix(".zarr.zip")
-            with zr.ZipStore(f"{zr_path}") as store:
+            zr_path = tmp_key.with_suffix(".zarr.db")
+            with zr.DBMStore(f"{zr_path}", open=bsddb3.btopen) as store:
                 ds_nc.to_zarr(store, mode="w")
 
             # Mark Zarr conversion complete
@@ -92,7 +93,7 @@ def nc_to_zarr(key):
 
 def validate_zarr(key):
     nc_path = TMPDIR / Path(key).with_suffix(".nc").name
-    zr_path = TMPDIR / Path(key).with_suffix(".zarr.zip").name
+    zr_path = TMPDIR / Path(key).with_suffix(".zarr.db").name
 
     exc_list = find_exclusion_list(nc_path.name)
 
@@ -113,16 +114,17 @@ def validate_zarr(key):
 
     # Move Zarr output
     # Odd error with shutil.move that throws an error with Path
-    # But this will be fixed in Python 3.9 (i.e. update later)
-    zr_output = Path(key).with_suffix(".zarr.zip")
+    # But this will be fixed in Python 3.9 (TODO: follow up then)
+    zr_output = Path(key).with_suffix(".zarr.db")
 
     if zr_output.exists():
         shutil.rmtree(zr_output)
     shutil.move(zr_str, zr_output.as_posix())
 
-    # Unlink leftover files
+    # Unlink .bin3D file
     Path(key).with_suffix(".bin3D").unlink()
 
+    # Unlink temporary files
     for item in TMPDIR.glob("*"):
         item.unlink()
 
