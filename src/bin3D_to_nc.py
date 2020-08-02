@@ -18,6 +18,7 @@ from lib.handler import update_dict, find_exclusion_list
 
 CONFIG = read_config()
 BIN3D2NC = Path(f"{CONFIG['root']}/{CONFIG['bin3D2nc']}")
+DEST = Path(f"{CONFIG['dst']}")
 TMPDIR = Path(os.environ["TMPDIR"])
 
 
@@ -87,7 +88,7 @@ def nc_to_zarr(key):
             # Validate Zarr output against netCDF
             validate_zarr(key)
         except ValueError:
-            print(Path(key.name))
+            print(Path(key))
             print("! Duplicate found. Check leftover zarr folder. \n")
 
 
@@ -97,10 +98,7 @@ def validate_zarr(key):
 
     exc_list = find_exclusion_list(nc_path.name)
 
-    # Since I do not care for Windows
-    nc_str = nc_path.as_posix()
-    zr_str = zr_path.as_posix()
-    with xopen(nc_str) as d_nc, xopen(zr.ZipStore(zr_str)) as d_za:
+    with xopen(nc_path) as d_nc, xopen(zr_path) as d_za:
         try:
             d_nc = d_nc.squeeze("time").drop(exc_list)
 
@@ -115,11 +113,12 @@ def validate_zarr(key):
     # Move Zarr output
     # Odd error with shutil.move that throws an error with Path
     # But this will be fixed in Python 3.9 (TODO: follow up then)
-    zr_output = Path(key).with_suffix(".zarr.db")
+    # zr_output = Path(key).with_suffix(".zarr.db")
+    zr_output = DEST / (Path(key).with_suffix(".zarr.db")).name
 
     if zr_output.exists():
-        shutil.rmtree(zr_output)
-    shutil.move(zr_str, zr_output.as_posix())
+        zr_output.unlink()
+    shutil.move(zr_path, zr_output.as_posix())
 
     # Unlink .bin3D file
     Path(key).with_suffix(".bin3D").unlink()
