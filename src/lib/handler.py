@@ -6,15 +6,17 @@ from .config import read_config
 
 config = read_config()
 
-def update_dict(key=None, target=4, finished=4, flag=1):
+def update_dict(key=None, target=4, goal=4, flag=1):
     pwd = config["pwd"]
     with f_lock(f"{pwd}/bin3D_list.json") as json_file:
         json_dict = json.load(json_file)
 
         if key is None:
             for key in json_dict.keys():
-                if json_dict[key] != finished:
+                if json_dict[key] != goal:
                     break
+            else:
+                return None
         json_dict[key] = flag
     
     with open(f"{pwd}/bin3D_list.json", 'w+') as json_file:
