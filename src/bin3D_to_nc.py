@@ -39,12 +39,14 @@ def xopen(target):
 def bin3D_to_nc(key, target=4, flag=1, print_stdout=False):
     # Ensure target files are in $TMPDIR
     bin3D2nc = TMPDIR / BIN3D2NC.name
-    tmp_key = TMPDIR / Path(key).name
+    nc_name = TMPDIR / Path(Path(key).with_suffix('.nc')).name
+    tmp_key = TMPDIR / 'tmp.bin3D'
     shutil.copy(BIN3D2NC, bin3D2nc)
     shutil.copy(key, tmp_key)
 
     try:
         result = sp.run([bin3D2nc, tmp_key], check=True, capture_output=True,)
+        os.rename(Path(tmp_key).with_suffix('.nc'), nc_name)
     except sp.CalledProcessError as e:
         print(f"Error translating {key}\n", e.output)
 
