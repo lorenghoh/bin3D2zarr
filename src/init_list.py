@@ -10,7 +10,7 @@ pwd = config["pwd"]
 
 
 def main():
-    bin3D_dir = f"{config['src']}"
+    bin3D_dir = f"{config['root']}/{config['casename']}/OUT_3D/"
     print(bin3D_dir)
 
     file_list = sorted(glob.glob(f"{bin3D_dir}/{config['casename']}_*.bin3D"))
