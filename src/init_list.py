@@ -1,6 +1,7 @@
 import glob
 import json
 
+from pathlib import Path
 from collections import defaultdict as dd
 
 import lib.config
@@ -10,16 +11,17 @@ pwd = config["pwd"]
 
 
 def main():
-    bin3D_dir = f"{config['root']}/{config['casename']}/OUT_3D/"
-    print(bin3D_dir)
+    bin3D_dir = f"{config['root']}/{config['case']}/OUT_3D/"
 
-    file_list = sorted(glob.glob(f"{bin3D_dir}/{config['casename']}_*.bin3D"))
+    print(f"Target directory is: \n\t {bin3D_dir} \n")
+
+    file_list = sorted(glob.glob(f"{bin3D_dir}/{config['case']}_*.bin3D"))
     file_dict = dd(int)
     for item in file_list:
-        file_dict[item] = 0
+        file_dict[Path(item).name] = 0
 
-    for item in file_list[:12]:
-        print(item)
+    for item in file_list[:8]:
+        print(Path(item).name)
 
     with open(f"{pwd}/bin3D_list.json", "w") as jf:
         jf.write(json.dumps(file_dict, indent=4))

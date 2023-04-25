@@ -11,7 +11,7 @@ def write_template():
         config = {
             "pwd": pwd.as_posix(),
             "root": "",
-            "casename": "",
+            "case": "",
             "output": "",
             "bin3D2nc": "UTIL/bin3D2nc",
         }
