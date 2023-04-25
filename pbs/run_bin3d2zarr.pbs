@@ -1,13 +1,19 @@
-#PBS -N bin3D2nc
-#PBS -m n
-#PBS -q smp
-#PBS -l nodes=1:ppn=20
-#PBS -l walltime=7:00:00:00
+#PBS -N bin3D2zarr
+#PBS -l nodes=1:ppn=24
+#PBS -l walltime=3:00:00:00
 #PBS -j oe
+#PBS -V
 
-# Needed on Optimum until zsh is officially supported
-source "/home/paustin/loh/.local/conda/etc/profile.d/conda.sh"
-conda activate 
+# Initialize virtual Python environment
+source $HOME/.local/opt/conda/etc/profile.d/conda.sh
+conda activate
 
-cd /home/paustin/loh/repos/bin3D2zarr/src
-python -B run_conversion.py
+cd $PBS_O_WORKDIR/
+
+echo "PBS: Current Working Directory is" $PWD
+
+# Main code block
+python -B src/run_conversion.py
+
+# On exit
+echo "PBS: Job finished successfully"
