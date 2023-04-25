@@ -88,11 +88,6 @@ def nc_to_zarr(key):
             raise ValueError
 
         try:
-            # Define compressor
-            # Turned off for now (only gives 3 GB -> 2.7 GB)
-            # comp = {'compressor': zr.Blosc(cname='zstd')}
-            # encoding = {var: comp for var in ds_nc}
-
             zr_path = _key.with_suffix(".zarr")
             with zr.NestedDirectoryStore(f"{zr_path}") as store:
                 ds_nc.to_zarr(store, mode="w")
