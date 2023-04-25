@@ -4,7 +4,6 @@ Now supports multiple processes
 """
 import os
 import shutil
-import bsddb3
 
 import subprocess as sp
 
@@ -17,19 +16,26 @@ from lib.config import read_config
 from lib.handler import update_dict, find_exclusion_list
 
 CONFIG = read_config()
-BIN3D2NC = Path(f"{CONFIG['root']}/{CONFIG['bin3D2nc']}")
-DEST = Path(f"{CONFIG['dst']}")
-TMPDIR = Path(os.environ["TMPDIR"])
+BIN3D2NC = Path(f"{CONFIG['root']}/{CONFIG['case']}/{CONFIG['bin3D2nc']}")
+DEST = Path(f"{CONFIG['output']}")
 
+# Use TMPDIR for Torque jobs
+# Otherwise use destination directory
+f_tmp = True
+try:
+    TMPDIR = Path(os.environ["tmp"])
+except KeyError:
+    f_tmp = False
+    TMPDIR = DEST
 
-def xopen(target):
+def _xopen(target):
     """
     Helper function for xarray.open_dataset()
     """
     if target.suffix == ".nc":
         ds = xr.open_dataset(target)
-    elif target.suffix == ".db":
-        ds = xr.open_zarr(zr.DBMStore(target, open=bsddb3.btopen))
+    elif target.suffix == ".zarr":
+        ds = xr.open_zarr(target)
     else:
         raise TypeError("Dataset type not recognized")
 
@@ -37,16 +43,23 @@ def xopen(target):
 
 
 def bin3D_to_nc(key, target=4, flag=1, print_stdout=False):
-    # Ensure target files are in $TMPDIR
-    bin3D2nc = TMPDIR / BIN3D2NC.name
-    nc_name = TMPDIR / Path(Path(key).with_suffix('.nc')).name
-    tmp_key = TMPDIR / 'tmp.bin3D'
-    shutil.copy(BIN3D2NC, bin3D2nc)
-    shutil.copy(key, tmp_key)
+    if f_tmp:
+        bin3D2nc = TMPDIR / BIN3D2NC.name
+        _key = TMPDIR / 'tmp.bin3D'
+
+        shutil.copy(BIN3D2NC, bin3D2nc)
+        shutil.copy(key, _key)
+    else:
+        bin3D2nc = BIN3D2NC
+        _key = TMPDIR / key
+
+    nc_name = TMPDIR / Path(_key).with_suffix('.nc').name
 
     try:
-        result = sp.run([bin3D2nc, tmp_key], check=True, capture_output=True,)
-        os.rename(Path(tmp_key).with_suffix('.nc'), nc_name)
+        result = sp.run([bin3D2nc, _key], check=True, capture_output=True,)
+
+        if f_tmp:
+            os.rename(Path(_key).with_suffix('.nc'), nc_name)
     except sp.CalledProcessError as e:
         print(f"Error translating {key}\n", e.output)
 
@@ -54,7 +67,8 @@ def bin3D_to_nc(key, target=4, flag=1, print_stdout=False):
         update_dict(key, target=target, flag=flag)
         raise
 
-    bin3D2nc.unlink()
+    if f_tmp:
+        bin3D2nc.unlink()
 
     if print_stdout:
         print(result.stdout)
@@ -64,10 +78,10 @@ def bin3D_to_nc(key, target=4, flag=1, print_stdout=False):
 
 
 def nc_to_zarr(key):
-    tmp_key = TMPDIR / Path(key).with_suffix(".nc").name
-    exc_list = find_exclusion_list(tmp_key.name)
+    _key = TMPDIR / Path(key).with_suffix(".nc")
+    exc_list = find_exclusion_list(_key.name)
 
-    with xopen(tmp_key) as ds_nc:
+    with _xopen(_key) as ds_nc:
         try:
             ds_nc = ds_nc.squeeze("time").drop(exc_list)
         except Exception:
@@ -77,11 +91,10 @@ def nc_to_zarr(key):
             # Define compressor
             # Turned off for now (only gives 3 GB -> 2.7 GB)
             # comp = {'compressor': zr.Blosc(cname='zstd')}
-            # encoding = {var: comp for var in variables}
+            # encoding = {var: comp for var in ds_nc}
 
-            # Use $TMPDIR for Zarr output
-            zr_path = tmp_key.with_suffix(".zarr.db")
-            with zr.DBMStore(f"{zr_path}", open=bsddb3.btopen) as store:
+            zr_path = _key.with_suffix(".zarr")
+            with zr.NestedDirectoryStore(f"{zr_path}") as store:
                 ds_nc.to_zarr(store, mode="w")
 
             # Mark Zarr conversion complete
@@ -95,15 +108,14 @@ def nc_to_zarr(key):
 
 
 def validate_zarr(key):
-    nc_path = TMPDIR / Path(key).with_suffix(".nc").name
-    zr_path = TMPDIR / Path(key).with_suffix(".zarr.db").name
+    nc_path = TMPDIR / Path(key).with_suffix(".nc")
+    zr_path = TMPDIR / Path(key).with_suffix(".zarr")
 
     exc_list = find_exclusion_list(nc_path.name)
 
-    with xopen(nc_path) as d_nc, xopen(zr_path) as d_za:
+    with _xopen(nc_path) as d_nc, _xopen(zr_path) as d_za:
         try:
             d_nc = d_nc.squeeze("time").drop(exc_list)
-
             flag = d_nc.equals(d_za)
 
             if flag is False:
@@ -112,22 +124,21 @@ def validate_zarr(key):
             print("Translated Zarr dataset does not match .nc file")
             raise
 
-    # Move Zarr output
-    # Odd error with shutil.move that throws an error with Path
-    # But this will be fixed in Python 3.9 (TODO: follow up then)
-    # zr_output = Path(key).with_suffix(".zarr.db")
-    zr_output = DEST / (Path(key).with_suffix(".zarr.db")).name
-
-    if zr_output.exists():
-        zr_output.unlink()
-    shutil.move(zr_path, zr_output.as_posix())
-
     # Unlink .bin3D file
-    Path(key).with_suffix(".bin3D").unlink()
+    Path(nc_path).with_suffix(".bin3D").unlink()
 
-    # Unlink temporary files
-    for item in TMPDIR.glob("*"):
-        item.unlink()
+    if f_tmp:
+        # Clean up tmp directory
+        # Move Zarr output file
+        zr_output = DEST / Path(key).with_suffix(".zarr")
+
+        if zr_output.exists():
+            zr_output.unlink()
+        shutil.move(zr_path, zr_output.as_posix())
+
+        # Unlink temporary files
+        for item in TMPDIR.glob("*"):
+            item.unlink()
 
     # Mark Zarr validation complete
     update_dict(key, flag=4)
