@@ -18,7 +18,7 @@ def update_dict(key=None, target=4, goal=4, flag=1):
             else:
                 return None
         json_dict[key] = flag
-    
+
     with open(f"{pwd}/bin3D_list.json", 'w+') as json_file:
         json_file.write(json.dumps(json_dict, indent=4))
 
@@ -32,6 +32,7 @@ def find_exclusion_list(file_name):
     if tag in ['CORE', 'CLOUD']:
         exc_list = []
     else:
-        exc_list = ['QI', 'NI', 'QS', 'NS', 'QG', 'NG']
+        exc_list = []
+        # exc_list = ['QI', 'NI', 'QS', 'NS', 'QG', 'NG']
 
     return exc_list

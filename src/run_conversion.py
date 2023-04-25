@@ -5,6 +5,7 @@ import bin3D_to_nc as bin3d
 
 def convert():
     key = update_dict()
+
     if key is None:
         return False
 
@@ -14,6 +15,7 @@ def convert():
         raise Exception
 
     bin3d.nc_to_zarr(key)
+
     return True
 
 
