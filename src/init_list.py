@@ -15,7 +15,7 @@ def main():
 
     print(f"Target directory is: \n\t {bin3D_dir} \n")
 
-    file_list = sorted(glob.glob(f"{bin3D_dir}/{config['case']}_*.bin3D"))
+    file_list = sorted(glob.glob(f"{bin3D_dir}/*.bin3D"))
     file_dict = dd(int)
     for item in file_list:
         file_dict[Path(item).name] = 0

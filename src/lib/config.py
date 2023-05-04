@@ -11,8 +11,8 @@ def write_template():
         config = {
             "pwd": pwd.as_posix(),
             "root": "",
-            "case": "",
-            "output": "",
+            "src": "",
+            "dst": "",
             "bin3D2nc": "UTIL/bin3D2nc",
         }
         json.dump(config, config_file, indent=0)

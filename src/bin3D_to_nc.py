@@ -119,8 +119,9 @@ def validate_zarr(key):
             print("Translated Zarr dataset does not match .nc file")
             raise
 
-    # Unlink .bin3D file
+    # Unlink intermediary files
     Path(nc_path).with_suffix(".bin3D").unlink()
+    Path(nc_path).unlink()
 
     if f_tmp:
         # Clean up tmp directory
